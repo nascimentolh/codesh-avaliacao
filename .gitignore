@@ -1,0 +1,30 @@
+# Dependencies
+/vendor/
+composer.lock
+
+# Environment variables
+.env
+
+# Database
+/database/*.db
+/database/*.db-journal
+/database/*.sqlite
+/database/*.sqlite3
+
+# Logs
+/storage/logs/*.log
+/storage/logs/*.txt
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS
+Thumbs.db
+
+# PHP
+.phpunit.result.cache
