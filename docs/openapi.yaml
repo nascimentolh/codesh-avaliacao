@@ -1,0 +1,456 @@
+openapi: 3.0.3
+info:
+  title: Open Food Facts API
+  description: |
+    REST API para gerenciar dados nutricionais do Open Food Facts.
+
+    Esta API permite consultar, atualizar e gerenciar informações de produtos alimentícios
+    importados do projeto Open Food Facts.
+
+    ## Autenticação
+    A API utiliza autenticação por API Key. Inclua sua chave no header `X-API-KEY` em todas as requisições
+    (exceto o endpoint de health check).
+
+  version: 1.0.0
+  contact:
+    name: Luiz Nascimento
+    email: luizh.nnh@gmail.com
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8000
+    description: Servidor de desenvolvimento
+  - url: http://localhost:8080
+    description: Servidor Docker
+
+tags:
+  - name: Health
+    description: Verificação de saúde da API
+  - name: Products
+    description: Operações com produtos
+
+paths:
+  /:
+    get:
+      tags:
+        - Health
+      summary: Health Check
+      description: Verifica o status da API, conexão com banco de dados, última execução do CRON e uso de recursos
+      operationId: healthCheck
+      responses:
+        '200':
+          description: API está funcionando corretamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheck'
+              example:
+                status: OK
+                database:
+                  connection: OK
+                  read: OK
+                  write: OK
+                last_cron_run: "2026-01-19 02:00:00"
+                uptime_seconds: 3600.50
+                memory_usage:
+                  bytes: 2097152
+                  human: "2.00 MB"
+                timestamp: "2026-01-19 14:30:00"
+
+  /products:
+    get:
+      tags:
+        - Products
+      summary: Listar produtos
+      description: Lista todos os produtos com paginação
+      operationId: listProducts
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: Número da página
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Número de itens por página
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Lista de produtos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Product'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /products/{code}:
+    get:
+      tags:
+        - Products
+      summary: Obter produto
+      description: Retorna os detalhes de um produto específico
+      operationId: getProduct
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: code
+          in: path
+          required: true
+          description: Código do produto
+          schema:
+            type: integer
+            example: 20221126
+      responses:
+        '200':
+          description: Detalhes do produto
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    put:
+      tags:
+        - Products
+      summary: Atualizar produto
+      description: Atualiza as informações de um produto existente
+      operationId: updateProduct
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: code
+          in: path
+          required: true
+          description: Código do produto
+          schema:
+            type: integer
+            example: 20221126
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductUpdate'
+            example:
+              product_name: "Madalenas Quadradas Atualizado"
+              quantity: "400g"
+              brands: "La Cestera Premium"
+      responses:
+        '200':
+          description: Produto atualizado com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Product updated successfully"
+                  data:
+                    $ref: '#/components/schemas/Product'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    delete:
+      tags:
+        - Products
+      summary: Deletar produto
+      description: Move o produto para a lixeira (soft delete)
+      operationId: deleteProduct
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: code
+          in: path
+          required: true
+          description: Código do produto
+          schema:
+            type: integer
+            example: 20221126
+      responses:
+        '200':
+          description: Produto movido para lixeira
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Product moved to trash successfully"
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-KEY
+      description: API Key para autenticação
+
+  schemas:
+    HealthCheck:
+      type: object
+      properties:
+        status:
+          type: string
+          example: OK
+        database:
+          type: object
+          properties:
+            connection:
+              type: string
+              enum: [OK, FAILED]
+            read:
+              type: string
+              enum: [OK, FAILED]
+            write:
+              type: string
+              enum: [OK, FAILED]
+        last_cron_run:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2026-01-19 02:00:00"
+        uptime_seconds:
+          type: number
+          format: float
+          example: 3600.50
+        memory_usage:
+          type: object
+          properties:
+            bytes:
+              type: integer
+              example: 2097152
+            human:
+              type: string
+              example: "2.00 MB"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2026-01-19 14:30:00"
+
+    Product:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 20221126
+        status:
+          type: string
+          enum: [draft, trash, published]
+          example: published
+        imported_t:
+          type: string
+          format: date-time
+          example: "2020-02-07T16:00:00Z"
+        url:
+          type: string
+          format: uri
+          nullable: true
+          example: "https://world.openfoodfacts.org/product/20221126"
+        creator:
+          type: string
+          nullable: true
+          example: "securita"
+        created_t:
+          type: integer
+          nullable: true
+          example: 1415302075
+        last_modified_t:
+          type: integer
+          nullable: true
+          example: 1572265837
+        product_name:
+          type: string
+          nullable: true
+          example: "Madalenas quadradas"
+        quantity:
+          type: string
+          nullable: true
+          example: "380 g (6 x 2 u.)"
+        brands:
+          type: string
+          nullable: true
+          example: "La Cestera"
+        categories:
+          type: string
+          nullable: true
+          example: "Lanches comida, Lanches doces, Biscoitos e Bolos"
+        labels:
+          type: string
+          nullable: true
+          example: "Contem gluten, Contém derivados de ovos"
+        cities:
+          type: string
+          nullable: true
+          example: ""
+        purchase_places:
+          type: string
+          nullable: true
+          example: "Braga,Portugal"
+        stores:
+          type: string
+          nullable: true
+          example: "Lidl"
+        ingredients_text:
+          type: string
+          nullable: true
+          example: "farinha de trigo, açúcar, óleo vegetal"
+        traces:
+          type: string
+          nullable: true
+          example: "Frutos de casca rija,Leite,Soja"
+        serving_size:
+          type: string
+          nullable: true
+          example: "madalena 31.7 g"
+        serving_quantity:
+          type: number
+          format: float
+          nullable: true
+          example: 31.7
+        nutriscore_score:
+          type: integer
+          nullable: true
+          example: 17
+        nutriscore_grade:
+          type: string
+          nullable: true
+          example: "d"
+        main_category:
+          type: string
+          nullable: true
+          example: "en:madeleines"
+        image_url:
+          type: string
+          format: uri
+          nullable: true
+          example: "https://static.openfoodfacts.org/images/products/20221126/front_pt.5.400.jpg"
+
+    ProductUpdate:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+        creator:
+          type: string
+        product_name:
+          type: string
+        quantity:
+          type: string
+        brands:
+          type: string
+        categories:
+          type: string
+        labels:
+          type: string
+        cities:
+          type: string
+        purchase_places:
+          type: string
+        stores:
+          type: string
+        ingredients_text:
+          type: string
+        traces:
+          type: string
+        serving_size:
+          type: string
+        serving_quantity:
+          type: number
+        nutriscore_score:
+          type: integer
+        nutriscore_grade:
+          type: string
+        main_category:
+          type: string
+        image_url:
+          type: string
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          example: 150
+        total_pages:
+          type: integer
+          example: 8
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Not Found"
+        message:
+          type: string
+          example: "Product with code 12345 not found"
+
+  responses:
+    NotFound:
+      description: Recurso não encontrado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Not Found"
+            message: "Product with code 12345 not found"
+
+    Unauthorized:
+      description: Não autorizado - API Key inválida ou ausente
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Unauthorized"
+            message: "Invalid or missing API key. Include X-API-KEY header."
+
+    BadRequest:
+      description: Requisição inválida
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Bad Request"
+            message: "Invalid data provided"
