@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: open-food-facts-api
+    ports:
+      - "8080:80"
+    volumes:
+      - ./database:/var/www/html/database
+      - ./storage/logs:/var/www/html/storage/logs
+    environment:
+      - APP_NAME=Open Food Facts API
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - DB_PATH=/var/www/html/database/app.db
+      - API_KEY=${API_KEY:-dev-api-key-12345}
+      - CRON_HOUR=02
+      - CRON_MINUTE=00
+      - OPEN_FOOD_FACTS_URL=https://challenges.coode.sh/food/data/json
+      - IMPORT_LIMIT_PER_FILE=100
+      - DEFAULT_PAGE_SIZE=20
+      - MAX_PAGE_SIZE=100
+    restart: unless-stopped
+    networks:
+      - api-network
+
+networks:
+  api-network:
+    driver: bridge
